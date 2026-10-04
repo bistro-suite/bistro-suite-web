@@ -61,6 +61,7 @@ async function stubMenu(browser: { route: (url: string, handler: (route: any) =>
 test("la carta filtra por categoría y búsqueda, y oculta productos agotados", async ({ app, browser, screen }) => {
   await stubMenu(browser);
   await app.open("/#la-carta");
+  await expect(screen.getByRole("link", "Panel administrativo")).toBeVisible();
 
   await expect(screen.getByRole("heading", "La carta")).toBeVisible();
   await expect(screen.getByRole("button", /Ver Pastel de garbanzo/)).toBeVisible();

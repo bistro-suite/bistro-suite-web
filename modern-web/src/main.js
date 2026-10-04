@@ -7,6 +7,13 @@ const storageKey = "bistro-demo-cart-v1";
 const orderAttemptKey = "bistro-demo-order-attempt-v1";
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const bistroSlug = import.meta.env.VITE_BISTRO_SLUG || "demo-bistro";
+const adminDemo = {
+  enabled: import.meta.env.VITE_ADMIN_DEMO_ENABLED === "true",
+  readOnly: import.meta.env.VITE_ADMIN_DEMO_READ_ONLY === "true",
+  email: import.meta.env.VITE_ADMIN_DEMO_EMAIL || "",
+  password: import.meta.env.VITE_ADMIN_DEMO_PASSWORD || "",
+  message: import.meta.env.VITE_ADMIN_DEMO_MESSAGE || "Puedes explorar el panel. En este modo demo no está permitido agregar, quitar ni modificar información.",
+};
 
 function readCart() {
   try {
@@ -350,6 +357,7 @@ const App = {
         m("a.brand", { href: "#inicio", "aria-label": "Bistró, ir al inicio" }, [m("span.brand-mark", { "aria-hidden": "true" }, "b"), m("span", [m("strong", "bistró"), m("small", state.menuMeta?.demo ? "carta de muestra" : "carta del día")])]),
         m("nav.header-actions", { "aria-label": "Acciones" }, [
           m("span.header-note", state.menuMeta?.demo ? "Menú de ejemplo" : "Carta del bistró"),
+          adminDemo.enabled ? m("a.button.admin-entry", { href: "/admin" }, "Panel administrativo") : null,
           m("button.button.cart-button", { type: "button", onclick: openCart, "aria-haspopup": "dialog", "aria-expanded": state.cartOpen }, [m("span", "Tu carrito"), m("span.cart-badge", { "aria-label": `${cartCount()} productos` }, cartCount())]),
         ]),
       ]),
@@ -368,8 +376,14 @@ const App = {
   },
 };
 
-const admin = { user: null, products: [], orders: [], orderQuery: "", orderStatusFilter: "all", selectedOrder: null, orderReturnFocus: null, settings: null, activeTab: "orders", form: null, file: null, loading: true, busy: false, error: "", notice: "" };
+const admin = { user: null, products: [], orders: [], orderQuery: "", orderStatusFilter: "all", selectedOrder: null, orderReturnFocus: null, settings: null, activeTab: "orders", form: null, file: null, loading: true, busy: false, error: "", notice: "", blockedAction: "" };
 const blankProduct = () => ({ name: "", description: "", category: "Platos principales", price_cop: 0, available: true, tag: "", illustration: "🍽️" });
+
+function blockDemoMutation(action) {
+  if (!adminDemo.readOnly) return false;
+  admin.blockedAction = action;
+  return true;
+}
 
 function csrfHeaders() {
   const token = document.cookie.split("; ").find((part) => part.startsWith("XSRF-TOKEN="))?.slice("XSRF-TOKEN=".length);
@@ -416,6 +430,7 @@ function loginAdmin(event) {
 
 function saveAdminProduct(event) {
   event.preventDefault();
+  if (blockDemoMutation("guardar este producto")) return;
   const form = event.currentTarget;
   const values = new FormData(form);
   const payload = {
@@ -447,6 +462,7 @@ function saveAdminProduct(event) {
 }
 
 function deleteAdminProduct(product) {
+  if (blockDemoMutation(`eliminar “${product.name}”`)) return;
   if (!window.confirm(`¿Eliminar “${product.name}” de la carta?`)) return;
   admin.busy = true;
   adminRequest("DELETE", `/api/v1/admin/products/${product.id}`)
@@ -460,6 +476,7 @@ function logoutAdmin() {
 }
 
 function updateOrderStatus(order, status) {
+  if (blockDemoMutation("cambiar el estado del pedido")) return;
   admin.busy = true;
   admin.error = "";
   adminRequest("PATCH", `/api/v1/admin/orders/${order.id}/status`, { status })
@@ -525,6 +542,7 @@ function filteredAdminOrders() {
 
 function saveBistroSettings(event) {
   event.preventDefault();
+  if (blockDemoMutation("guardar la configuración")) return;
   const values = new FormData(event.currentTarget);
   const payload = {
     delivery_enabled: values.get("delivery_enabled") === "on",
@@ -555,16 +573,33 @@ function BistroSettingsForm() {
   ]);
 }
 
+function DemoRestrictionDialog() {
+  if (!admin.blockedAction) return null;
+  const close = () => { admin.blockedAction = ""; };
+  return m("div.admin-dialog-backdrop", {
+    onclick: (event) => { if (event.target === event.currentTarget) close(); },
+    onkeydown: (event) => { if (event.key === "Escape") { event.preventDefault(); close(); } },
+  }, m("section.demo-restriction-dialog", { role: "dialog", "aria-modal": "true", "aria-labelledby": "demo-restriction-title", "aria-describedby": "demo-restriction-copy", oncreate: (vnode) => vnode.dom.querySelector("button")?.focus() }, [
+    m("span.demo-restriction-icon", { "aria-hidden": "true" }, "✓"),
+    m("span.eyebrow", "BISTRO SUITE · MODO DEMO"),
+    m("h2#demo-restriction-title", "Acción no disponible"),
+    m("p#demo-restriction-copy", adminDemo.message),
+    m("small", `Acción: ${admin.blockedAction}. No se guardó ningún cambio.`),
+    m("button.button.button-primary", { type: "button", onclick: close }, "Entendido"),
+  ]));
+}
+
 function AdminApp() {
   if (admin.loading) return m("main.admin-shell", m("p", { role: "status" }, "Cargando tu espacio…"));
   if (!admin.user) return m("main.admin-shell", m("section.admin-login", [
     m("a.brand.admin-brand", { href: "/" }, [m("span.brand-mark", "b"), m("span", [m("strong", "bistró"), m("small", "gestión de carta")])]),
     m("span.eyebrow", "ADMINISTRACIÓN"), m("h1", "Tu carta, bajo control"), m("p", "Ingresa con la cuenta de administración de tu bistró."),
+    adminDemo.enabled ? m("div.demo-login-card", [m("span.eyebrow", adminDemo.readOnly ? "ACCESO DE DEMOSTRACIÓN · SOLO LECTURA" : "ACCESO DE DEMOSTRACIÓN"), m("p", "Las credenciales ya están preparadas para que explores el portal."), m("span", [m("strong", "Usuario"), ` ${adminDemo.email}`]), m("span", [m("strong", "Contraseña"), ` ${adminDemo.password}`])]) : null,
     admin.error ? m("p.admin-message.is-error", { role: "alert" }, admin.error) : null,
     m("form.admin-form", { onsubmit: loginAdmin }, [
-      m("label", ["Correo electrónico", m("input", { name: "email", type: "email", autocomplete: "username", required: true })]),
-      m("label", ["Contraseña", m("input", { name: "password", type: "password", autocomplete: "current-password", required: true })]),
-      m("button.button.button-primary", { type: "submit", disabled: admin.busy }, admin.busy ? "Ingresando…" : "Ingresar"),
+      m("label", ["Correo electrónico", m("input", { name: "email", type: "email", autocomplete: "username", required: true, value: adminDemo.enabled ? adminDemo.email : "" })]),
+      m("label", ["Contraseña", m("input", { name: "password", type: "password", autocomplete: "current-password", required: true, value: adminDemo.enabled ? adminDemo.password : "" })]),
+      m("button.button.button-primary", { type: "submit", disabled: admin.busy }, admin.busy ? "Ingresando…" : adminDemo.enabled ? "Entrar al panel de muestra" : "Ingresar"),
     ]), m("a.admin-back", { href: "/" }, "← Volver a la carta"),
   ]));
 
@@ -574,14 +609,15 @@ function AdminApp() {
     ["all", "Todos"], ["pending", "Pendientes"], ["confirmed", "Confirmados"], ["delivered", "Entregados"], ["cancelled", "Cancelados"],
   ];
   return m("main.admin-shell", [
-    m("header.admin-header", [m("a.brand.admin-brand", { href: "/" }, [m("span.brand-mark", "b"), m("span", [m("strong", "bistró"), m("small", "gestión de carta")])]), m("div", [m("span.admin-account", `${admin.user.bistro?.name || "Bistró"} · ${admin.user.name}`), m("button.text-button", { type: "button", onclick: logoutAdmin }, "Cerrar sesión")])]),
+    m("header.admin-header", [m("a.brand.admin-brand", { href: "/" }, [m("span.brand-mark", "b"), m("span", [m("strong", "bistró"), m("small", "gestión de carta")])]), m("div", [adminDemo.readOnly ? m("span.demo-readonly-badge", "Demo · Solo lectura") : null, m("span.admin-account", `${admin.user.bistro?.name || "Bistró"} · ${admin.user.name}`), m("button.text-button", { type: "button", onclick: logoutAdmin }, "Cerrar sesión")])]),
     m("section.admin-content", [
+      adminDemo.readOnly ? m("p.demo-readonly-banner", [m("strong", "Estás en modo de solo lectura."), ` ${adminDemo.message}`]) : null,
       m("nav.admin-tabs", { "aria-label": "Administración del bistró" }, [
         m("button.admin-tab", { type: "button", class: admin.activeTab === "orders" ? "is-active" : "", onclick: () => { admin.activeTab = "orders"; admin.form = null; admin.notice = ""; } }, `Pedidos · ${admin.orders.filter((order) => order.status === "pending").length} pendientes`),
         m("button.admin-tab", { type: "button", class: admin.activeTab === "products" ? "is-active" : "", onclick: () => { admin.activeTab = "products"; admin.notice = ""; } }, "Productos"),
         m("button.admin-tab", { type: "button", class: admin.activeTab === "settings" ? "is-active" : "", onclick: () => { admin.activeTab = "settings"; admin.form = null; admin.notice = ""; } }, "Entrega y recogida"),
       ]),
-      admin.activeTab === "orders" ? m("div.admin-title-row", [m("div", [m("span.eyebrow", "ATENCIÓN AL CLIENTE"), m("h1", "Pedidos recibidos"), m("p", "Los pedidos más recientes de tu bistró, con sus datos de contacto y entrega.")]), m("button.button.button-secondary", { type: "button", disabled: admin.busy, onclick: () => loadAdmin(false) }, "Actualizar")]) : admin.activeTab === "products" ? m("div.admin-title-row", [m("div", [m("span.eyebrow", "TU NEGOCIO"), m("h1", "Productos de la carta"), m("p", `${admin.products.length} productos · ${categories.length} categorías`)]), m("button.button.button-primary", { type: "button", onclick: () => { admin.form = blankProduct(); admin.file = null; admin.error = ""; } }, "+ Nuevo producto")]) : m("div.admin-title-row", [m("div", [m("span.eyebrow", "CONFIGURACIÓN"), m("h1", "Entrega y recogida"), m("p", "Define dónde y cómo pueden recibir sus pedidos.")])]),
+      admin.activeTab === "orders" ? m("div.admin-title-row", [m("div", [m("span.eyebrow", "ATENCIÓN AL CLIENTE"), m("h1", "Pedidos recibidos"), m("p", "Los pedidos más recientes de tu bistró, con sus datos de contacto y entrega.")]), m("button.button.button-secondary", { type: "button", disabled: admin.busy, onclick: () => loadAdmin(false) }, "Actualizar")]) : admin.activeTab === "products" ? m("div.admin-title-row", [m("div", [m("span.eyebrow", "TU NEGOCIO"), m("h1", "Productos de la carta"), m("p", `${admin.products.length} productos · ${categories.length} categorías`)]), m("button.button.button-primary", { type: "button", onclick: () => { if (blockDemoMutation("agregar un producto")) return; admin.form = blankProduct(); admin.file = null; admin.error = ""; } }, "+ Nuevo producto")]) : m("div.admin-title-row", [m("div", [m("span.eyebrow", "CONFIGURACIÓN"), m("h1", "Entrega y recogida"), m("p", "Define dónde y cómo pueden recibir sus pedidos.")])]),
       admin.notice ? m("p.admin-message", { role: "status" }, admin.notice) : null,
       admin.error ? m("p.admin-message.is-error", { role: "alert" }, admin.error) : null,
       admin.activeTab === "orders" ? m("div.admin-order-browser", [
@@ -593,13 +629,13 @@ function AdminApp() {
         m("section.admin-orders", { "aria-label": "Pedidos" }, visibleOrders.length ? visibleOrders.map((order) => m("article.admin-order", { key: order.id }, [
         m("header.admin-order-header", [m("div", [m("span.eyebrow", `${order.reference} · ${orderDate(order.created_at)}`), m("h2", order.customer_name)]), m("span.admin-order-status", { class: `status-${order.status}` }, orderStatusLabel(order.status))]),
         m("div.admin-order-summary", [m("span", order.fulfillment_method === "delivery" ? `Domicilio · ${order.neighborhood}` : "Recogida en el local"), m("span", `${order.items.reduce((sum, item) => sum + item.quantity, 0)} artículos`), m("strong", money.format(order.total_cop))]),
-        m("footer.admin-order-footer", [m("button.text-button", { type: "button", onclick: (event) => openOrderDetails(order, event) }, "Ver detalle del pedido →"), m("div.admin-order-actions", [order.allowed_next_statuses.includes("confirmed") ? m("button.button.button-primary", { type: "button", disabled: admin.busy, onclick: () => updateOrderStatus(order, "confirmed") }, "Confirmar") : null, order.allowed_next_statuses.includes("delivered") ? m("button.button.button-primary", { type: "button", disabled: admin.busy, onclick: () => updateOrderStatus(order, "delivered") }, "Marcar entregado") : null, order.allowed_next_statuses.includes("cancelled") ? m("button.text-button.admin-delete", { type: "button", disabled: admin.busy, onclick: () => { if (window.confirm(`¿Cancelar el pedido ${order.reference}?`)) updateOrderStatus(order, "cancelled"); } }, "Cancelar") : null])]),
+        m("footer.admin-order-footer", [m("button.text-button", { type: "button", onclick: (event) => openOrderDetails(order, event) }, "Ver detalle del pedido →"), m("div.admin-order-actions", [order.allowed_next_statuses.includes("confirmed") ? m("button.button.button-primary", { type: "button", disabled: admin.busy, onclick: () => updateOrderStatus(order, "confirmed") }, "Confirmar") : null, order.allowed_next_statuses.includes("delivered") ? m("button.button.button-primary", { type: "button", disabled: admin.busy, onclick: () => updateOrderStatus(order, "delivered") }, "Marcar entregado") : null, order.allowed_next_statuses.includes("cancelled") ? m("button.text-button.admin-delete", { type: "button", disabled: admin.busy, onclick: () => { if (blockDemoMutation("cancelar este pedido")) return; if (window.confirm(`¿Cancelar el pedido ${order.reference}?`)) updateOrderStatus(order, "cancelled"); } }, "Cancelar") : null])]),
         ])) : admin.orders.length ? m("p.admin-empty-orders", [m("span", { "aria-hidden": true }, "⌕"), m("strong", "No encontramos pedidos"), m("span", "Prueba con otra búsqueda o cambia el filtro de estado."), m("button.text-button", { type: "button", onclick: () => { admin.orderQuery = ""; admin.orderStatusFilter = "all"; } }, "Mostrar todos los pedidos")]) : m("p.admin-empty-orders", [m("span", { "aria-hidden": true }, "⌁"), m("strong", "Todavía no hay pedidos"), m("span", "Cuando alguien confirme su pedido desde la carta, aparecerá aquí.")]))
       ]) : admin.activeTab === "products" ? m("div.admin-layout", [
         m("section.admin-products", { "aria-label": "Productos" }, admin.products.length ? admin.products.map((product) => m("article.admin-product", { key: product.id }, [
           product.image_url ? m("img.admin-product-image", { src: product.image_url, alt: "", loading: "lazy" }) : m("span.admin-product-image.admin-product-placeholder", product.illustration),
           m("div.admin-product-copy", [m("span.eyebrow", product.category), m("strong", product.name), m("span", money.format(product.price_cop)), m("span.admin-availability", { class: product.available ? "is-available" : "" }, product.available ? "Disponible" : "Agotado")]),
-          m("div.admin-product-actions", [m("button.text-button", { type: "button", onclick: () => { admin.form = { ...product }; admin.file = null; admin.error = ""; } }, "Editar"), m("button.text-button.admin-delete", { type: "button", disabled: admin.busy, onclick: () => deleteAdminProduct(product) }, "Eliminar")]),
+          m("div.admin-product-actions", [m("button.text-button", { type: "button", onclick: () => { if (blockDemoMutation(`editar “${product.name}”`)) return; admin.form = { ...product }; admin.file = null; admin.error = ""; } }, "Editar"), m("button.text-button.admin-delete", { type: "button", disabled: admin.busy, onclick: () => deleteAdminProduct(product) }, "Eliminar")]),
         ])) : m("p", "Aún no hay productos.")),
         admin.form ? m("form.admin-form.admin-editor", { onsubmit: saveAdminProduct }, [
           m("div", [m("span.eyebrow", admin.form.id ? "EDITAR PRODUCTO" : "NUEVO PRODUCTO"), m("h2", admin.form.id ? admin.form.name : "Agregar a la carta")]),
@@ -615,6 +651,7 @@ function AdminApp() {
       ]) : BistroSettingsForm(),
     ]),
     AdminOrderDetails(),
+    DemoRestrictionDialog(),
   ]);
 }
 

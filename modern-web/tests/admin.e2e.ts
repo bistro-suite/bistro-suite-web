@@ -8,10 +8,12 @@ test("el panel guía al administrador sin sesión a iniciar sesión", async ({ a
   await expect(screen.getByRole("heading", "Tu carta, bajo control")).toBeVisible();
   await expect(screen.getByLabel("Correo electrónico")).toBeVisible();
   await expect(screen.getByLabel("Contraseña")).toBeVisible();
+  await expect(screen.getByLabel("Correo electrónico")).toHaveValue("demo@example.test");
+  await expect(screen.getByText("ACCESO DE DEMOSTRACIÓN · SOLO LECTURA")).toBeVisible();
   await expect(screen.getByRole("link", "← Volver a la carta")).toBeVisible();
 });
 
-test("el panel muestra bandeja, filtros y detalle con una sesión de prueba", async ({ app, browser, screen }) => {
+test("el panel demo permite explorar el portal y bloquea las acciones de escritura", async ({ app, browser, screen }) => {
   let orderStatus = "pending";
   let submittedStatus: string | undefined;
   const order = {
@@ -38,7 +40,10 @@ test("el panel muestra bandeja, filtros y detalle con una sesión de prueba", as
     email: "admin@example.test",
     bistro: { id: 1, name: "Bistró E2E", slug: "demo-bistro" },
   } } }));
-  await browser.route("**/api/v1/admin/products", (route) => route.fulfill({ status: 200, json: { data: [] } }));
+  await browser.route("**/api/v1/admin/products", (route) => route.fulfill({ status: 200, json: { data: [{
+    id: 21, name: "Pastel de garbanzo", description: "Plato regional", category: "Para empezar", price_cop: 7000,
+    available: true, image_url: "/images/menu/cucuta/pastel-garbanzo.webp", illustration: "🥟", tag: "Regional",
+  }] } }));
   await browser.route("**/api/v1/admin/settings", (route) => route.fulfill({ status: 200, json: { data: {
     delivery_enabled: true,
     delivery_fee_cop: 5000,
@@ -70,11 +75,44 @@ test("el panel muestra bandeja, filtros y detalle con una sesión de prueba", as
   await expect(dialog).toBeVisible();
   await expect(screen.getByText("Nota: Sin cebolla")).toBeVisible();
   await dialog.getByRole("button", "Confirmar pedido").tap();
-  await expect(dialog.getByRole("button", "Marcar entregado")).toBeVisible();
-  if (submittedStatus !== "confirmed") throw new Error(`El panel no envió el estado confirmado: ${submittedStatus}`);
-  await dialog.getByRole("button", "Marcar entregado").tap();
-  await expect(dialog.getByRole("button", "Marcar entregado")).toHaveCount(0);
-  if (submittedStatus !== "delivered" || orderStatus !== "delivered") {
-    throw new Error(`El panel no completó la transición a entregado: ${submittedStatus}`);
-  }
+  await expect(screen.getByRole("dialog", "Acción no disponible")).toBeVisible();
+  await expect(screen.getByText("Puedes explorar el portal, pero el demo no permite guardar cambios.")).toBeVisible();
+  if (submittedStatus || orderStatus !== "pending") throw new Error("El modo demo intentó cambiar el estado del pedido.");
+  await screen.getByRole("button", "Entendido").tap();
+  await dialog.getByRole("button", "Cerrar detalle").tap();
+
+  await screen.getByRole("button", "Productos").tap();
+  await screen.getByRole("button", "Editar").tap();
+  await expect(screen.getByRole("dialog", "Acción no disponible")).toBeVisible();
+  await screen.getByRole("button", "Entendido").tap();
+  await screen.getByRole("button", "+ Nuevo producto").tap();
+  await expect(screen.getByRole("dialog", "Acción no disponible")).toBeVisible();
+  await screen.getByRole("button", "Entendido").tap();
+
+  await screen.getByRole("button", "Entrega y recogida").tap();
+  await screen.getByRole("button", "Guardar configuración").tap();
+  await expect(screen.getByRole("dialog", "Acción no disponible")).toBeVisible();
+});
+
+test("las credenciales precargadas permiten entrar al espacio de muestra", async ({ app, browser, screen }) => {
+  let authChecks = 0;
+  await browser.route("**/sanctum/csrf-cookie", (route) => route.fulfill({ status: 204 }));
+  await browser.route("**/api/v1/auth/login", (route) => route.fulfill({ status: 200, json: { data: { id: 5 } } }));
+  await browser.route("**/api/v1/auth/user", (route) => {
+    authChecks += 1;
+    return route.fulfill(authChecks === 1
+      ? { status: 401, json: { message: "Unauthenticated." } }
+      : { status: 200, json: { data: { id: 5, name: "Admin demo", email: "demo@example.test", bistro: { name: "Bistró E2E" } } } });
+  });
+  await browser.route("**/api/v1/admin/products", (route) => route.fulfill({ status: 200, json: { data: [] } }));
+  await browser.route("**/api/v1/admin/orders", (route) => route.fulfill({ status: 200, json: { data: [] } }));
+  await browser.route("**/api/v1/admin/settings", (route) => route.fulfill({ status: 200, json: { data: {
+    delivery_enabled: true, delivery_fee_cop: 5000, delivery_neighborhoods: ["Centro"], pickup_enabled: true,
+    pickup_address: "Dirección de prueba", is_demo: true,
+  } } }));
+
+  await app.open("/admin");
+  await screen.getByRole("button", "Entrar al panel de muestra").tap();
+  await expect(screen.getByRole("heading", "Pedidos recibidos")).toBeVisible();
+  await expect(screen.getByText("Demo · Solo lectura")).toBeVisible();
 });

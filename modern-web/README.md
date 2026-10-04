@@ -14,6 +14,12 @@ La carta de muestra reutiliza una imagen de comida y las fuentes Alegreya Sans d
 
 Para ejecutar localmente el cliente en contenedor junto con Laravel, usa Compose según las instrucciones del [repositorio del API](https://github.com/bistro-suite/bistro-suite-api/blob/main/README.md). El contenedor de desarrollo Node 24 monta este directorio y sirve Vite en `http://localhost:5173/`.
 
+## Pruebas E2E
+
+Con Node.js 24.8 o posterior, ejecuta `npm run test:e2e`. La suite usa Tester Army E2E con Chromium y simula las respuestas del API: verifica búsqueda y categorías, productos agotados, checkout de domicilio y recogida, recuperación ante validaciones del API, y la bandeja administrativa con confirmación y entrega de pedidos. No requiere credenciales ni crea pedidos en Railway. Los reportes y artefactos locales se guardan en `.e2e/`.
+
+La exploración asistida puede buscar huecos de navegación con `npm run test:e2e:explore -- 'Explora la carta como cliente y busca problemas de navegación'`. Requiere configurar un modelo compatible con Tester Army. La exploración debe apuntar a un entorno local con datos ficticios; no usarla contra producción para completar formularios ni enviar pedidos. Su agente requiere un modelo y puede interactuar con la aplicación según las instrucciones de exploración.
+
 Los platos, precios, cobertura de Centro/Caobos/La Riviera, tarifa de domicilio de $5.000 COP y dirección de recogida son datos ilustrativos. Antes de presentar la demo como un negocio real, cambia la configuración de entrega desde el panel. El carrito y su clave de idempotencia se guardan en `sessionStorage`: los refrescos y reintentos en la pestaña actual no crean un segundo pedido. Al editar el carrito se genera una nueva clave. El checkout envía los datos al API público, que vuelve a calcular los precios, valida el barrio configurado, aplica la tarifa y registra el pedido. Esta demo no incluye pagos, cálculo de impuestos, cuentas de clientes ni seguimiento público de pedidos.
 
 ## Railway

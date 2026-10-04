@@ -172,7 +172,7 @@ function submitOrder(event) {
     .then(() => m.request({
       method: "POST",
       url: `${apiBaseUrl}/api/v1/public/bistros/${encodeURIComponent(bistroSlug)}/orders`,
-      data: payload,
+      body: payload,
       headers: csrfHeaders(),
       background: true,
     }))
@@ -377,7 +377,7 @@ function csrfHeaders() {
 }
 
 function adminRequest(method, url, data) {
-  return m.request({ method, url: `${apiBaseUrl}${url}`, data, headers: csrfHeaders(), background: true });
+  return m.request({ method, url: `${apiBaseUrl}${url}`, body: data, headers: csrfHeaders(), background: true });
 }
 
 function loadAdmin(showLoading = true) {

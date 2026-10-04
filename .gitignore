@@ -25,6 +25,9 @@ node_modules/
 
 # Brunch output folder.
 public/
+# The modern Vite app keeps deployable static assets in its own public/ tree.
+!modern-web/public/
+!modern-web/public/**
 .idea
 web
 public/sftp-config.json

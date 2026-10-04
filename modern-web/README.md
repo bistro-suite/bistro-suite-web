@@ -1,6 +1,8 @@
-# Modern web scaffold
+# Bistro Suite Web Client
 
-New Mithril 2 + Vite client scaffold, kept alongside the historical app. This directory is intended to be the Railway service root for the web app.
+Mithril 2 + Vite client for Bistro Suite, kept alongside the historical Cars Admin app. This directory is the Railway service root for the web app.
+
+**Live demo:** [bistro-web-production.up.railway.app](https://bistro-web-production.up.railway.app/). The demo includes the public menu and `/admin`; production admin credentials are set privately and are not documented here.
 
 ## Local use
 
@@ -10,12 +12,10 @@ The storefront loads `GET /api/v1/public/bistros/{slug}/menu` from Laravel throu
 
 The menu demo reuses one food image and the Alegreya Sans font files from the legacy repositories. Their origin and use are recorded in [ASSET_PROVENANCE.md](./ASSET_PROVENANCE.md). The `/admin` route provides cookie-based login, product management, and a recent-order inbox searchable by reference or customer name, phone and email. Status filters include counts. Each compact summary opens a **Ver detalle del pedido** dialog with customer contact, destination, item notes and total breakdown. Staff can change allowed statuses from the inbox or dialog. The **Entrega y recogida** tab configures delivery coverage, flat fee and pickup address. The public cart completes guest checkout for enabled methods, displays the delivery fee and shows a receipt reference; it does not process payment. Sample admin credentials are documented in the API README and are only for local Compose.
 
-For the containerized local environment shared with Laravel, use the Compose setup documented in the [API repository](../../cars-admin-api/README.md). It mounts this directory into the Node 24 development container and serves Vite at `http://localhost:5173/`.
+For the containerized local environment shared with Laravel, use the Compose setup documented in the [API repository](https://github.com/bistro-suite/bistro-suite-api/blob/main/README.md). It mounts this directory into the Node 24 development container and serves Vite at `http://localhost:5173/`.
 
 The menu data, prices, Centro/Caobos/La Riviera coverage, $5,000 COP delivery fee and pickup address are illustrative only. Replace the fulfillment settings in the admin before using the demo to represent a real business. The cart and its checkout idempotency key are stored in `sessionStorage`, so refreshes and retries in the current tab do not create a second order. Editing the cart generates a new attempt key. Checkout submits the cart to the public API, which recalculates prices, validates the configured neighborhood, applies the fee and creates the order. Payment, tax calculation, customer accounts and public order tracking remain outside this demo.
 
 ## Railway
 
-The included `railway.toml` follows the separate frontend service layout used by `gestion-monitorias/frontend/railway.toml`, with current Railpack commands and this app's private API proxy. Configure the Railway service root directory as `/modern-web` relative to the repository. Set `API_PROXY_TARGET` to `http://bistro-api.railway.internal:8080` for the private API service. The server listens on the platform-provided `$PORT`.
-
-Railway's config-as-code documentation marks these files as deprecated effective 2026-12-01; before that date, migrate the build/deploy settings to the Railway dashboard or current IaC mechanism in use by the project. Confirm Railway's current guidance when creating the service.
+The live Railway service deploys this directory from the `main` branch with root directory `/modern-web`. Its Node server listens on Railway's `$PORT` and sets `API_PROXY_TARGET` to `http://bistro-api.railway.internal:8080`, keeping API, Sanctum and uploaded-image requests on the same public origin while the API remains private. The service follows the separate frontend layout from `gestion-monitorias/frontend/railway.toml`, adapted to this app. Keep the checked-in `railway.toml` and Railway service settings aligned; see [Railway's config-as-code reference](https://docs.railway.com/config-as-code/reference).

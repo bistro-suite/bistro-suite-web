@@ -1,7 +1,7 @@
 # Bistro Suite Web
 
-This repository contains the Mithril web client for [Bistro Suite](https://bistro-web-production.up.railway.app/), alongside the historical Cars Admin client in `app/`.
+Este repositorio contiene el cliente web de Mithril para [Bistro Suite](https://bistro-web-production.up.railway.app/) y conserva en `app/` el cliente histórico de Cars Admin.
 
-The live demo serves the public menu and admin panel from the same origin. Railway deploys `modern-web/` from `main`; its Node server proxies API, Sanctum and uploaded-image requests through the private Railway network. Demo admin credentials are configured privately and are not published in this README.
+La demo pública ofrece la carta y el panel de administración desde el mismo origen. Railway despliega `modern-web/` desde `main`; su servidor Node reenvía las solicitudes del API, Sanctum y las imágenes subidas por la red privada de Railway. Las credenciales del administrador demo se configuran de forma privada y no se publican en este README.
 
-See [`modern-web/README.md`](modern-web/README.md) for the current client, local development, and Railway configuration. The Docker and Whaler setup for running both repositories locally is in the [API repository README](https://github.com/bistro-suite/bistro-suite-api/blob/main/README.md). Historical Cars Admin screenshots are omitted here until current product screenshots are available.
+Consulta la [guía de `modern-web`](modern-web/README.md) para conocer el cliente actual, el desarrollo local y la configuración de Railway. El [README del API](https://github.com/bistro-suite/bistro-suite-api/blob/main/README.md) explica cómo ejecutar ambos repositorios con Docker y Whaler. Omitimos las capturas históricas de Cars Admin hasta contar con imágenes actuales del producto.
